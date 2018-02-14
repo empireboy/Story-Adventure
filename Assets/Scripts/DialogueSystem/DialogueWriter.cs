@@ -4,15 +4,18 @@ using System.Collections.Generic;
 
 public class DialogueWriter : MonoBehaviour {
 
+    [HideInInspector] public GameObject _startedWritingObject;
+    [HideInInspector] public bool _writing = false;
+
     private List<string> _dialogueTextArray = new List<string>();
     private List<string> _dialogueButtonTextArray = new List<string>();
-    private bool _writing = false;
     private bool _endLine = false;
+    private bool _waitingAnswer = false;
     private int _index = -1;
     private int _charIndex = -1;
     private float _charTimer = 0;
 
-    [SerializeField] private List<GameObject> _buttonArray = new List<GameObject>();
+    [SerializeField] private List<Button> _buttonArray = new List<Button>();
     [SerializeField] private Text _dialogueText;
     [SerializeField] private GameObject _dialogueBox;
     [SerializeField] private float _nextCharTime;
@@ -22,28 +25,24 @@ public class DialogueWriter : MonoBehaviour {
         _nextCharTime = _nextCharTime * Time.deltaTime;
     }
 
-    public void WriterInit(List<string> dialogueTextArray, List<string> dialogueButtonTextArray)
+    public void WriterInit(List<string> dialogueTextArray, List<string> dialogueButtonTextArray, GameObject startedWritingObject)
     {
         // Check if dialogue is already writing
         if (!_writing) {
 
             // Clear
             _dialogueTextArray.Clear();
-            _dialogueButtonTextArray.Clear();
+            if (dialogueButtonTextArray.Count <= 0) { _dialogueButtonTextArray.Clear(); }
 
             // Get dialogue text
             for (int i = 0; i < dialogueTextArray.Count; i++) _dialogueTextArray.Add(dialogueTextArray[i]);
 
             // Get dialogue button text
-            if (dialogueButtonTextArray != null)
+            if (dialogueButtonTextArray.Count > 0)
             {
-                for (int i = 0; i < dialogueButtonTextArray.Count; i++) _dialogueButtonTextArray.Add(dialogueButtonTextArray[i]);
-
-                // Activate buttons
                 for (int i = 0; i < dialogueButtonTextArray.Count; i++)
                 {
-                    _buttonArray[i].GetComponentInChildren<Text>().text = _dialogueButtonTextArray[i];
-                    _buttonArray[i].SetActive(true);
+                    _dialogueButtonTextArray.Add(dialogueButtonTextArray[i]);
                 }
             }
 
@@ -54,6 +53,8 @@ public class DialogueWriter : MonoBehaviour {
             _charTimer = _nextCharTime;
             _dialogueText.text = "";
             _dialogueBox.SetActive(true);
+            _waitingAnswer = false;
+            _startedWritingObject = startedWritingObject;
         }
         else
         {
@@ -95,7 +96,8 @@ public class DialogueWriter : MonoBehaviour {
             }
             else
             {
-                if (Input.GetKeyDown(KeyCode.Z) && _index <= _dialogueTextArray.Count - 1)
+                if (_dialogueButtonTextArray.Count > 0 && _index >= _dialogueTextArray.Count - 1 && !_waitingAnswer) ActivateButtons();
+                else if (Input.GetKeyDown(KeyCode.E) && _index <= _dialogueTextArray.Count - 1 && !_waitingAnswer)
                 {
                     if (_index < _dialogueTextArray.Count - 1)
                     {
@@ -108,9 +110,17 @@ public class DialogueWriter : MonoBehaviour {
                     else
                     {
                         // Stop writing
-                        StopWriting();
+                        if (_dialogueButtonTextArray.Count <= 0) StopWriting();
                     }
                 }
+                /*else if (_waitingAnswer)
+                {
+                    for (int i = 0; i < _dialogueButtonTextArray.Count; i++)
+                    {
+                        Debug.Log(i);
+                        _buttonArray[i].onClick.AddListener(delegate { ButtonClicked(i); });
+                    }
+                }*/
             }
         }
     }
@@ -122,6 +132,8 @@ public class DialogueWriter : MonoBehaviour {
         _dialogueText.text = "";
         _dialogueBox.SetActive(false);
         DeactiveButtons();
+        _waitingAnswer = false;
+        _startedWritingObject = null;
     }
     
     private void DeactiveButtons()
@@ -131,6 +143,26 @@ public class DialogueWriter : MonoBehaviour {
         for (int i = 0; i < buttons.Length; i++)
         {
             buttons[i].SetActive(false);
+        }
+    }
+
+    private void ActivateButtons()
+    {
+        for (int i = 0; i < _dialogueButtonTextArray.Count; i++)
+        {
+            _buttonArray[i].GetComponentInChildren<Text>().text = _dialogueButtonTextArray[i];
+            _buttonArray[i].gameObject.SetActive(true);
+        }
+
+        _waitingAnswer = true;
+    }
+
+    public void ButtonClicked(int i)
+    {
+        if (_waitingAnswer)
+        {
+            _startedWritingObject.GetComponent<DialogueAnswer>().GetAnswer(i);
+            StopWriting();
         }
     }
 }
